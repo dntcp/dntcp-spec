@@ -35,7 +35,7 @@ Abstract
 2.1. Non-NAT'ed Communication
 
    Involves direct HTTP requests made to the peer API over exposed 
-   endpoint (e.g., /api/v1/route). Used in non-NAT-to-NAT
+   endpoint (e.g., /api/v1/route). Used in NAT-to-non-NAT
    and non-NAT-to-non-NAT connections.
 
 2.2. NAT'ed Communication
