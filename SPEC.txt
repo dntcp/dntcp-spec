@@ -1,0 +1,126 @@
+                                                           Fart Draws
+                                                        December 2023
+
+
+                 Do Not The Cat Protocol (DNTCP)
+
+Abstract
+
+   "Do Not The Cat Protocol" (DNTCP) is a peer-to-peer (P2P) protocol 
+   that establishes and maintains HTTP-based connections in network 
+   environments with Network Address Translation (NAT). The protocol 
+   enables communication in networks without Universal Plug and Play 
+   (UPnP), including those involving carrier-grade NAT.
+
+1. Introduction
+
+   This document proposes "Do Not The Cat Protocol" (DNTCP), a novel 
+   peer-to-peer (P2P) networking protocol focused on enabling 
+   NATed devices establish and maintain HTTP-based connections. Four
+   main types of communication connections are discussed here -  
+   non-NAT-to-non-NAT [HTTP to peer],  NAT-to-non-NAT [ICE/RTC to
+   peer], NAT-to-non-NAT-to-non-NAT [ICE/RTC to Federation to peer]
+   and NAT-to-non-NAT-to-NAT [ICE/RTC to Federation to ICE/RTC to peer]. 
+
+1.1. Terminology
+
+   Actor: An entity involved in executing or experiencing the outcomes
+   of the protocol (e.g., Sender Peer, Receiver Peer, Adjacent Peer,
+   Non-NATed Routing Peer).
+
+   Message: Information or directive transferred between actors.
+
+2. Communication Methods
+
+2.1. Non-NAT'ed Communication
+
+   Involves direct HTTP requests made to the peer API over exposed 
+   endpoint (e.g., /api/v1/route). Used in non-NAT-to-NAT
+   and non-NAT-to-non-NAT connections.
+
+2.2. NAT'ed Communication
+
+   NAT'ed Bootstrapping forms an ICE/RTC relay to relay HTTP requests 
+   to the peer AP. Used in NAT-to-non-NAT and NAT-to-NAT connections.
+
+3. Peer Records
+
+   Nodes maintain Peer Records, compiled as JSON packets:
+
+   {
+     "peer_name": "string",
+     "unique_id": "string",
+     "exposed": "boolean",
+     "address": "string, optional",
+     "age": "timestamp"
+   }
+
+   Peer Records aid nodes in determining the type of connection to be
+   facilitated. Discovery of peers is an ongoing process, with nodes 
+   frequently exchanging and updating their Peer Records.
+
+4. Bootstrapping Routines
+
+4.1. Direct Bootstrap Routine
+
+   Exchanges SDP Offers and Answers directly between adjacent NATed nodes.
+   
+   This is also known as ICE/RTC where bootstrapping is direct.
+
+   4.1.1 Connect Request (CR): 
+
+   {
+     "source_id": "string",
+     "destination_id": "string",
+     "sdp_offer": "SDP information"
+   }
+
+   4.1.2 Connect Response (CR):
+
+   {
+     "source_id": "string",
+     "destination_id": "string",
+     "sdp_answer": "SDP information"
+   }
+
+4.2. Indirect Bootstrap Routine
+
+   Used when connections are to be established between non-adjacent 
+   NATed nodes, leveraging non-NATed nodes as routing intermediaries.
+
+5. Routing System
+
+   Post-connection, nodes can pass payloads amongst each other to be parsed:
+
+   {
+     "source_id": "string",
+     "source_port": "string",
+     "destination_id": "string",
+     "destination_port": "string",
+     "payload": "string"
+   }
+
+5.1. RESTFul HTTP
+
+   Requests are made directly over '/api/v1/route'. These requests are the
+   typical standard HTTP requests in JSON format. Each request consists of
+   attributes that define operation (GET, POST, PUT, DELETE), target endpoint,
+   and data payload. 
+
+5.2. Streamed ICE/RTC
+
+   Streams packets over an ICE/RTC channel, encapsulating the HTTP
+   requests. The encapsulated data is base64 encoded HTTP or TCP 
+   packets, dictated by the protocol attribute. These packets are also 
+   in JSON format and include the complete information of the HTTP request.
+
+6. Security Considerations
+
+   TODO.
+
+   DNTCP does not include in-built security measures. Thus, each 
+   participating node is responsible for its data security.
+
+7. Acknowledgements
+
+   Gratitude to all who contributed to the development of DNTCP.
