@@ -8,23 +8,24 @@ Abstract
 
    "Do Not The Cat Protocol" (DNTCP) is a peer-to-peer (P2P) protocol 
    that establishes and maintains HTTP-based connections in network 
-   environments with Network Address Translation (NAT). The protocol 
-   enables communication in networks without Universal Plug and Play 
-   (UPnP), including those involving carrier-grade NAT.
+   environments with Network Address Translation (NAT) over WebRTC.
+   The protocol enables communication in networks without Universal
+   Plug and Play (UPnP), including those involving carrier-grade NAT.
 
 1. Introduction
 
-   This document proposes "Do Not The Cat Protocol" (DNTCP), a novel 
+   This document proposes "Do Not The Cat Protocol" (DNTCP), a 
    peer-to-peer (P2P) networking protocol focused on enabling 
-   NATed devices establish and maintain HTTP-based connections. Four
-   main types of communication connections are discussed here -  
-   non-NAT-to-non-NAT [HTTP to peer],  NAT-to-non-NAT [ICE/RTC to
-   peer], NAT-to-non-NAT-to-non-NAT [ICE/RTC to Federation to peer]
-   and NAT-to-non-NAT-to-NAT [ICE/RTC to Federation to ICE/RTC to peer]. 
+   NATed devices establish and maintain HTTP-based connections using
+   WebRTC as the tunnelling method. Four main types of communication
+   connections are discussed here - non-NAT-to-non-NAT [HTTP to peer], 
+   NAT-to-non-NAT [ICE/RTC to peer], NAT-to-non-NAT-to-non-NAT [ICE/
+   RTC to Federation to peer] and NAT-to-non-NAT-to-NAT [ICE/RTC to
+   Federation to ICE/RTC to peer]. 
 
 1.1. Terminology
 
-   Actor: An entity involved in executing or experiencing the outcomes
+   Nodes: An entity involved in executing or experiencing the outcomes
    of the protocol (e.g., Sender Peer, Receiver Peer, Adjacent Peer,
    Non-NATed Routing Peer).
 
@@ -35,52 +36,77 @@ Abstract
 2.1. Non-NAT'ed Communication
 
    Involves direct HTTP requests made to the peer API over exposed 
-   endpoint (e.g., /api/v1/route). Used in NAT-to-non-NAT
+   endpoint (e.g., /api/v1/route). Used as fallback in NAT-to-non-NAT
    and non-NAT-to-non-NAT connections.
 
 2.2. NAT'ed Communication
 
    NAT'ed Bootstrapping forms an ICE/RTC relay to relay HTTP requests 
-   to the peer AP. Used in NAT-to-non-NAT and NAT-to-NAT connections.
+   to the peer AP. Used for all connections, but is the sole option 
+   for NAT-to-non-NAT and NAT-to-NAT connections.
 
 3. Peer Records
 
    Nodes maintain Peer Records, compiled as JSON packets:
 
    {
-     "peer_name": "string",
-     "unique_id": "string",
-     "exposed": "boolean",
-     "address": "string, optional",
-     "age": "timestamp"
+      "peer_name": "string",
+      "unique_id": "string",
+      "exposed": "boolean",
+      "address": "string, optional",
+      "created": "timestamp",
+      "ttl": "number"
    }
 
    Peer Records aid nodes in determining the type of connection to be
    facilitated. Discovery of peers is an ongoing process, with nodes 
    frequently exchanging and updating their Peer Records.
 
+3.1 Peer Registry and Keep-alive
+
+   Nodes can register themselves or forward other peers under
+   `/api/v1/peer` via flooding, and obtain a node's peer-list
+   via `/api/v1/peers`.
+
+   TTL is used to make sure each broadcast doesn't keep propagating
+   infinitely.
+
+
 4. Bootstrapping Routines
+
+Bootstrapping help establish Peer Connections over ICE/RTC.
 
 4.1. Direct Bootstrap Routine
 
    Exchanges SDP Offers and Answers directly between adjacent NATed nodes.
    
-   This is also known as ICE/RTC where bootstrapping is direct.
+   Using SDP Offers, it is possible to establish an RTC connection between
+   two peers.
 
-   4.1.1 Connect Request (CR): 
+   4.1.1 Connect Offer (CO): 
+
+   This is received under '/api/v1/offer'.
 
    {
-     "source_id": "string",
-     "destination_id": "string",
-     "sdp_offer": "SDP information"
+      "source_id": "string",
+      "destination_id": "string",
+      "turn_server": "string",
+      "sdp_offer": "SDP information",
+      "created": "timestamp",
+      "ttl": "number"
    }
 
    4.1.2 Connect Response (CR):
 
+   This is received under '/api/v1/connect'. This is the response to a CO.
+
    {
-     "source_id": "string",
-     "destination_id": "string",
-     "sdp_answer": "SDP information"
+      "source_id": "string",
+      "destination_id": "string",
+      "turn_server": "string",
+      "sdp_answer": "SDP information",
+      "created": "timestamp",
+      "ttl": "number"
    }
 
 4.2. Indirect Bootstrap Routine
@@ -88,35 +114,44 @@ Abstract
    Used when connections are to be established between non-adjacent 
    NATed nodes, leveraging non-NATed nodes as routing intermediaries.
 
-5. Routing System
+   This requires flooding; forwarding COs to peers' '/api/v1/offer' and CRs
+   to '/api/v1/connect', until TTL is exhausted. These are assigned to
+   their respective source peer record. CRs can be expired as well.
+   
 
-   Post-connection, nodes can pass payloads amongst each other to be parsed:
+5. Peer Connections
+
+5.1 Content Packets
+
+   Post-connection, nodes can pass payloads amongst each other to be parsed.
+   These messages encapsulate the network layer payloads. The encapsulated
+   data is base64 encoded TCP or UDP packets, dictated by the protocol
+   attribute.
 
    {
      "source_id": "string",
-     "source_port": "string",
      "destination_id": "string",
-     "destination_port": "string",
-     "payload": "string"
+     "protocol": "string",
+     "payload": "string",
+     "ttl": "number"
    }
 
-5.1. RESTFul HTTP
+   Packet payloads are distributed over an ICE/RTC channel for non-NAT
+   targets and sources. If all adjacent peers are exposed, requests
+   containing packet payloads can be made directly over an HTTP PUT
+   request at '/api/v1/packet_send'. 
 
-   Requests are made directly over '/api/v1/route'. These requests are the
-   typical standard HTTP requests in JSON format. Each request consists of
-   attributes that define operation (GET, POST, PUT, DELETE), target endpoint,
-   and data payload. 
+   If the recepient isn't the target ID, the packet is flooded across the
+   network, and no longer passed around if TTL is exhausted or target ID is
+   reached.
 
-5.2. Streamed ICE/RTC
+5.1 ICE/RTC Connection Tracking
 
-   Streams packets over an ICE/RTC channel, encapsulating the HTTP
-   requests. The encapsulated data is base64 encoded HTTP or TCP 
-   packets, dictated by the protocol attribute. These packets are also 
-   in JSON format and include the complete information of the HTTP request.
+   Each peer need to track their ICE/RTC connections, thus each one of them
+   are maintained, expiring them after 30 seconds of no activity. Empty
+   packets can be used to achieve keep-alive.
 
 6. Security Considerations
-
-   TODO.
 
    DNTCP does not include in-built security measures. Thus, each 
    participating node is responsible for its data security.
