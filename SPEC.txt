@@ -25,6 +25,9 @@ Abstract
 
 1.1. Terminology
 
+   Flooding: Involves rebroadcasting messages to immediate peers to
+   distribute to the network.
+
    Nodes: An entity involved in executing or experiencing the outcomes
    of the protocol (e.g., Sender Peer, Receiver Peer, Adjacent Peer,
    Non-NATed Routing Peer).
@@ -45,7 +48,7 @@ Abstract
    to the peer AP. Used for all connections, but is the sole option 
    for NAT-to-non-NAT and NAT-to-NAT connections.
 
-3. Peer Records
+3. Peer Identity and Records
 
    Nodes maintain Peer Records, compiled as JSON packets:
 
@@ -55,6 +58,7 @@ Abstract
       "exposed": "boolean",
       "address": "string, optional",
       "created": "timestamp",
+      "public_key": "string",
       "ttl": "number"
    }
 
@@ -62,11 +66,20 @@ Abstract
    facilitated. Discovery of peers is an ongoing process, with nodes 
    frequently exchanging and updating their Peer Records.
 
-3.1 Peer Registry and Keep-alive
+   Each node has its own Peer Record to pass onto other peers.
 
-   Nodes can register themselves or forward other peers under
-   `/api/v1/peer` via flooding, and obtain a node's peer-list
-   via `/api/v1/peers`.
+3.1 Unique identity
+
+   To create a unique identity to use for a node's unique_id, the
+   following is computed.
+
+
+3.2 Peer Registry and Keep-alive
+
+   Nodes can register themselves or forward other peers at
+   `/api/v1/peer`, returning their own Peer Record. This gets
+   propagated to other nodes via flooding, and obtain a node's peer
+   list via `/api/v1/peers`.
 
    TTL is used to make sure each broadcast doesn't keep propagating
    infinitely.
@@ -74,14 +87,15 @@ Abstract
 
 4. Bootstrapping Routines
 
-Bootstrapping help establish Peer Connections over ICE/RTC.
+   Bootstrapping help establish Peer Connections over ICE/RTC.
 
 4.1. Direct Bootstrap Routine
 
-   Exchanges SDP Offers and Answers directly between adjacent NATed nodes.
+   Exchanges SDP Offers and Answers directly between adjacent NATed
+   nodes.
    
-   Using SDP Offers, it is possible to establish an RTC connection between
-   two peers.
+   Using SDP Offers, it is possible to establish an RTC connection
+   between two peers.
 
    4.1.1 Connect Offer (CO): 
 
@@ -98,7 +112,8 @@ Bootstrapping help establish Peer Connections over ICE/RTC.
 
    4.1.2 Connect Response (CR):
 
-   This is received under '/api/v1/connect'. This is the response to a CO.
+   This is received under '/api/v1/connect'. This is the response to a
+   CO.
 
    {
       "source_id": "string",
@@ -114,19 +129,22 @@ Bootstrapping help establish Peer Connections over ICE/RTC.
    Used when connections are to be established between non-adjacent 
    NATed nodes, leveraging non-NATed nodes as routing intermediaries.
 
-   This requires flooding; forwarding COs to peers' '/api/v1/offer' and CRs
-   to '/api/v1/connect', until TTL is exhausted. These are assigned to
-   their respective source peer record. CRs can be expired as well.
+   This is done via forwarding.
+   
+   On receive COs and CRs, if they're not the destination, nodes need to
+   forward COs to peers' '/api/v1/offer' and CRs to '/api/v1/connect',
+   until TTL is exhausted. These are assigned to their respective source
+   peer record. CRs can be expired as well.
    
 
 5. Peer Connections
 
 5.1 Content Packets
 
-   Post-connection, nodes can pass payloads amongst each other to be parsed.
-   These messages encapsulate the network layer payloads. The encapsulated
-   data is base64 encoded TCP or UDP packets, dictated by the protocol
-   attribute.
+   Post-connection, nodes can pass payloads amongst each other to be
+   parsed. These messages encapsulate the network layer payloads. The
+   encapsulated data is base64 encoded HTTP packets, dictated by the
+   protocol attribute.
 
    {
      "source_id": "string",
@@ -141,15 +159,27 @@ Bootstrapping help establish Peer Connections over ICE/RTC.
    containing packet payloads can be made directly over an HTTP PUT
    request at '/api/v1/packet_send'. 
 
-   If the recepient isn't the target ID, the packet is flooded across the
-   network, and no longer passed around if TTL is exhausted or target ID is
-   reached.
+   If the recepient isn't the target ID, the packet is flooded across
+   thenetwork, and no longer passed around if TTL is exhausted or
+   target ID is reached.
 
-5.1 ICE/RTC Connection Tracking
+5.2 Routing Content Packets
 
-   Each peer need to track their ICE/RTC connections, thus each one of them
-   are maintained, expiring them after 30 seconds of no activity. Empty
-   packets can be used to achieve keep-alive.
+   First a node must receive the Content Packet from a peer either via
+   HTTP or ICE/RTC.
+
+   On receiving a content packet, the payload is used to populate an
+   HTTP request to a port on http://[::ffff:127.0.0.1], at the node's
+   local network.
+
+   The response to this request from the local server is then relayed
+   onto the peer.
+
+5.3 ICE/RTC Connection Tracking
+
+   Each peer need to track their ICE/RTC connections, thus each one of
+   them are maintained, expiring them after 30 seconds of no activity.
+   Empty packets can be used to achieve keep-alive.
 
 6. Security Considerations
 
