@@ -1,8 +1,8 @@
-                                                           Fart Draws
-                                                        December 2023
+Do Not The Cat Protocol                                    Fart Draws
+CatnIP #0000                                             January 2024
 
 
-                 Do Not The Cat Protocol (DNTCP)
+            Defining the Do Not The Cat Protocol (DNTCP)
 
 Abstract
 
@@ -56,6 +56,7 @@ Abstract
       "peer_name": "string",
       "unique_id": "string",
       "exposed": "boolean",
+      "closest_peer": "string",
       "address": "string, optional",
       "created": "timestamp",
       "public_key": "string",
@@ -68,13 +69,35 @@ Abstract
 
    Each node has its own Peer Record to pass onto other peers.
 
-3.1 Unique identity
+3.1 Unique identity and In-Ecosystem Addressing
 
    To create a unique identity to use for a node's unique_id, the
    following is computed.
 
+   * Obtain the MAC address of the network interface on the server. 
+     The MAC address is a unique identifier assigned to the network 
+     interface by the manufacturer.
 
-3.2 Peer Registry and Keep-alive
+   * Obtain the Node name of the server. The Node name can be a 
+     user-defined name or a predefined name specific to your 
+     application.
+
+   * Concatenate the MAC address and the Node name to create a string
+     in the format "{MAC address}|{Node name}".
+
+   * Hash the concatenated string using a cryptographic hash function 
+     like SHA-256.
+
+   * The hashed value will serve as the unique identifier for the 
+     server.
+
+   To refer to a certain identity, the following URI formats are
+   used.
+
+   dweb://dntcp/{Unique identifier}/sub-directory
+   dntcp://{unique identifier}/sub-directory
+
+3.3 Peer Registry and Keep-alive
 
    Nodes can register themselves or forward other peers at
    `/api/v1/peer`, returning their own Peer Record. This gets
@@ -83,7 +106,6 @@ Abstract
 
    TTL is used to make sure each broadcast doesn't keep propagating
    infinitely.
-
 
 4. Bootstrapping Routines
 
@@ -99,7 +121,7 @@ Abstract
 
    4.1.1 Connect Offer (CO): 
 
-   This is received under '/api/v1/offer'.
+   This is forwarded to '/api/v1/offer'.
 
    {
       "source_id": "string",
@@ -112,8 +134,10 @@ Abstract
 
    4.1.2 Connect Response (CR):
 
-   This is received under '/api/v1/connect'. This is the response to a
-   CO.
+   This is forwarded to '/api/v1/connect' and is part of the
+   '/api/v1/offer' response body if the CO it is responding to had
+   no destination_id or the responding peer is the destination. This
+   is the response to a CO.
 
    {
       "source_id": "string",
